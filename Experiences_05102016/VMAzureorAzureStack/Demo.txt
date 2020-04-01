@@ -1,0 +1,5 @@
+cd C:\Users\AzureSTackAdmin\Desktop\VMAzureorAzureStack
+.\AzureandAzureStack.ps1 -resourceGroupName floappexp16 -StorageAccountName floappexp16 -vmName floappexp16 -adminUsername florent -dnsNameForPublicIP floappexp16
+
+C:\Users\AzureSTackAdmin\Desktop\VMAzureorAzureStack
+.\AzureandAzureStack.ps1 -resourceGroupName floappexp161 -StorageAccountName floappexp161 -vmName floappexp161 -adminUsername florent -dnsNameForPublicIP floappexp161

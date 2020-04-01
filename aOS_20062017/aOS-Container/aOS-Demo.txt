@@ -1,0 +1,83 @@
+##########################
+#Demo ACS
+##########################
+http://aosacsswarmagents.westeurope.cloudapp.azure.com
+#Tunnel SSH
+ssh -fNL 2375:localhost:2375 -p 2200 florent@aosacsswarmmgmt.westeurope.cloudapp.azure.com
+export DOCKER_HOST=:2375
+docker info
+
+#En direct
+ssh -p 2200 florent@aosacsswarmmgmt.westeurope.cloudapp.azure.com
+docker -H 172.16.0.5:2375 info
+
+#Ajouter un noeud
+
+#Deployer un container nginx via le master
+docker -H 10.0.0.4:2375 images
+docker -H 10.0.0.4:2375 ps
+docker -H 172.16.0.5:2375 run --name hello-aOS -d -p 80:80 nginx
+docker -H 10.0.0.4:2375 ps
+http://aosacsswarmagents.westeurope.cloudapp.azure.com/
+exit
+
+#Deployer un custom docker file
+cd OneDrive/aOS-Container/aOS-Demo-Flo
+docker build -t aosdemoacs:latest .
+docker run --name aosdemo -d -p 8080:80 aosdemoacs
+docker ps
+http://aosacsswarmagents.westeurope.cloudapp.azure.com:8080
+#check the port with the private IP to see the load balancing
+
+#Deployer un custom dockerfile depuis une registry
+#password: =+=/pc//++w/U/MGsY0EaBPK73=92vGJ
+ssh -p 2200 florent@aosacsswarmmgmt.westeurope.cloudapp.azure.com
+cd aOS-Demo-Flo
+docker login aostoulouse.azurecr.io -u aostoulouse
+docker build -t aostoulouse.azurecr.io/aosdemoacsacr:latest .
+docker push aostoulouse.azurecr.io/aosdemoacsacr:latest
+
+docker -H 10.0.0.4:2375 login aostoulouse.azurecr.io -u aostoulouse
+docker -H 10.0.0.4:2375 images
+docker -H 10.0.0.4:2375 run --name aosdemoacr -d -p 8080:80 aostoulouse.azurecr.io/aosdemoacsacr
+
+##########################
+#Demo Docker Datacenter
+##########################
+#Montrer l'ajout/suppression de noeud depuis azure avec les scale set
+#https://ucplb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/#/dashboard
+#https://dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/repositories
+
+# Download the DTR CA certificate
+#sudo curl -k https://dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/ca -o /usr/local/share/ca-certificates/dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com.crt
+# Refresh the list of certificates to trust
+#sudo update-ca-certificates
+# Restart the Docker daemon
+#sudo service docker restart
+
+docker login dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com -u florent
+
+#Deploy docker compose
+#deploy voteapp
+cd ..
+cd voting-app/vote
+docker login dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com -u florent
+docker build -t dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/florent/votingapp_vote:latest .
+docker push dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/florent/votingapp_vote:latest
+#Show in the DTR interface
+
+cd ..
+cd result
+docker build -t dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/florent/votingapp_result:latest .
+docker push dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/florent/votingapp_result:latest 
+
+cd ..
+cd worker
+docker build -t dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/florent/votingapp_worker:latest .
+docker push dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/florent/votingapp_worker:latest
+
+#Create load balancer rule
+#http://applb-nlamqdkncqpzc.westeurope.cloudapp.azure.com
+#http://applb-nlamqdkncqpzc.westeurope.cloudapp.azure.com:5000
+#http://aos.florentappointaire.cloud:5000/
+#http://applb-nlamqdkncqpzc.westeurope.cloudapp.azure.com:5001

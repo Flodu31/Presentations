@@ -1,0 +1,43 @@
+#Initiate
+az login
+az account set --subscription "subscriptionId"
+
+# Variables
+$rgName='VirtualAzure'
+$location='westeurope'
+$location2='northeurope'
+$dbServerName='virtualazure-cosmosdb'
+$aspServerName='VirtualAzure-AppService'
+$webAppServerName='VirtualAzure-WebApp'
+$trafficManagerName='VirtualAzure-TM'
+$dnsName='VirtualAzure'
+#$appGWName='VirtualAzure-AppGW'
+
+# Create the RG
+az group create --resource-group $rgName --location $location
+
+# Deploy CosmosDB instance
+az cosmosdb create --name $dbServerName --resource-group $rgName --locations regionName=francecentral failoverPriority=0 isZoneRedundant=False --locations regionName=francesouth failoverPriority=1 isZoneRedundant=False --enable-multiple-write-locations
+
+# Deploy the WebApp
+az appservice plan create --name $aspServerName --resource-group $rgName --sku S1
+az appservice plan create --name $aspServerName'NE' --resource-group $rgName --sku S1 --location $location2
+az webapp create --name $webAppServerName --resource-group $rgName --plan $aspServerName
+az webapp create --name $webAppServerName'NE' --resource-group $rgName --plan $aspServerName'NE'
+
+# Deploy App gateway + WAF
+#az network public-ip create --name $appGWName'-PIP' --resource-group $rgName --allocation-method Static --location $location
+#az network application-gateway create --name $appGWName --resource-group $rgName --capacity 2 --frontend-port 80 --sku WAF_v2 --location $location \
+                                      --http-settings-port 443 --http-settings-protocol Https --routing-rule-type Basic \
+                                      --public-ip-address $appGWName'-PIP' --no-wait
+
+# Deploy the Traffic Manager
+az network traffic-manager profile create --name $trafficManagerName --resource-group $rgName --routing-method Performance --unique-dns-name $dnsName --protocol HTTP --status Enabled
+az network traffic-manager endpoint create --name $webAppServerName --profile-name $trafficManagerName --resource-group $rgName --type azureEndpoints --endpoint-status Enabled --target-resource-id $(az webapp show --name $webAppServerName --resource-group $rgName --query 'id' -o tsv)
+az network traffic-manager endpoint create --name $webAppServerName'NE' --profile-name $trafficManagerName --resource-group $rgName --type azureEndpoints --endpoint-status Enabled --target-resource-id $(az webapp show --name $webAppServerName'NE' --resource-group $rgName --query 'id' -o tsv)
+
+# Information needed
+az webapp show --name $webAppServerName --resource-group $rgName --query 'defaultHostName' -o tsv
+az webapp show --name $webAppServerName'NE' --resource-group $rgName --query 'defaultHostName' -o tsv
+az cosmosdb show --name $dbServerName --resource-group $rgName --query 'documentEndpoint' -o tsv
+az cosmosdb keys list --name $dbServerName --resource-group $rgName --query 'primaryMasterKey' -o tsv

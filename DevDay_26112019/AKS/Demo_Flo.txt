@@ -1,0 +1,18 @@
+- Show in Azure Security Center how to activate the scan, in pricing & settings > test > Kub/Con
+- https://shell.azure.com/
+- Security Alerts to see the alert (new generated alerts will be shown 40 minutes after the creation)
+
+=> ACR Scan
+az login
+az account set --subscription "subId"
+az acr login --name DevDay
+docker pull vulnerables/web-dvwa 
+docker image list => old image, more than 1 year, donc pas à jour
+docker tag vulnerables/web-dvwa:latest devday.azurecr.io/vulnerables/web-dvwa:v6
+docker image list
+docker push devday.azurecr.io/vulnerables/web-dvwa:v6
+
+Check the portal registry: https://portal.azure.com/#@florentappointaire.onmicrosoft.com/resource/subscriptions/c1ee26fd-0ad0-4392-8b72-b5a3383135a0/resourceGroups/DevDay/providers/Microsoft.ContainerRegistry/registries/DevDay/repository
+Check in ASC: https://portal.azure.com/#blade/Microsoft_Azure_Security/SecurityMenuBlade/5
+Vulnerabilities in Azure Container Registry images should be remediated (powered by Qualys)
+And show the vulnerabilities

@@ -1,0 +1,13 @@
+az account set --subscription subId
+az aks get-credentials --resource-group RG_AKSManagedClusterAKSLab --name AKSLabCluster1
+kubectl get pods
+jet@teknews.cloud
+
+
+az account set --subscription "subId2"
+az acr login --name DevDay
+docker pull vulnerables/web-dvwa 
+docker image list
+docker tag vulnerables/web-dvwa:latest devday.azurecr.io/vulnerables/web-dvwa:v8
+docker image list
+docker push devday.azurecr.io/vulnerables/web-dvwa:v8

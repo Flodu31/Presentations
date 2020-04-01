@@ -1,0 +1,7 @@
+version: '3'
+
+services:
+    aosdockeree:
+        image: dtrlb-nlamqdkncqpzc.westeurope.cloudapp.azure.com/florent/aosdemodockeree:latest
+        ports:
+            - 80:80

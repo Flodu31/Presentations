@@ -1,0 +1,62 @@
+#Initiate
+az login
+az account set --subscription "ce6d976b-5197-4ae5-8467-173ddf912b64"
+
+# AppGw
+$rgAppGw='VirtualAzureAppGw'
+$appGWName='VirtualAzure-AppGW'
+
+# Variables
+$rgName='VirtualAzure'
+$location='westeurope'
+$location2='northeurope'
+$dbServerName='virtualazure-cosmosdb'
+$aspServerName='VirtualAzure-AppService'
+$webAppServerName='VirtualAzure-WebApp'
+$trafficManagerName='VirtualAzure-TM'
+$dnsName='VirtualAzure'
+
+# Deploy App gateway + WAF
+az group create --resource-group $rgAppGw --location $location
+az network public-ip create --name $appGWName'-WE-PIP' --resource-group $rgAppGw --sku Standard --allocation-method Static --location $location
+az network public-ip create --name $appGWName'-NE-PIP' --resource-group $rgAppGw --sku Standard --allocation-method Static --location $location2
+az network application-gateway create --name $appGWName'WE' --resource-group $rgAppGw --capacity 2 --frontend-port 80 --sku WAF_v2 --location $location --http-settings-port 80 --http-settings-protocol Http --routing-rule-type Basic --public-ip-address $appGWName'-WE-PIP' --no-wait
+az network application-gateway create --name $appGWName'NE' --resource-group $rgAppGw --capacity 2 --frontend-port 80 --sku WAF_v2 --location $location2 --http-settings-port 80 --http-settings-protocol Http --routing-rule-type Basic --public-ip-address $appGWName'-NE-PIP' --no-wait
+
+# Create the RG
+az group create --resource-group $rgName --location $location
+
+# Deploy CosmosDB instance
+az cosmosdb create --name $dbServerName --resource-group $rgName --locations regionName=westus2 failoverPriority=0 isZoneRedundant=False --locations regionName=eastus2 failoverPriority=1 isZoneRedundant=False --enable-multiple-write-locations --enable-automatic-failover 
+
+# Deploy the WebApp
+az appservice plan create --name $aspServerName --resource-group $rgName --sku S1
+az appservice plan create --name $aspServerName'NE' --resource-group $rgName --sku S1 --location $location2
+az webapp create --name $webAppServerName --resource-group $rgName --plan $aspServerName
+az webapp create --name $webAppServerName'NE' --resource-group $rgName --plan $aspServerName'NE'
+az webapp show --name $webAppServerName --resource-group $rgName --query 'defaultHostName' -o tsv
+az webapp show --name $webAppServerName'NE' --resource-group $rgName --query 'defaultHostName' -o tsv
+
+# Modify App gateway
+$fqdnAppWE=$(az webapp show --name $webAppServerName --resource-group $rgName --query 'defaultHostName' -o tsv)
+$fqdnAppWE='{\"fqdn\":\"' + $fqdnAppWE + '\",\"ip_address\":null}'
+$fqdnAppNE=$(az webapp show --name $webAppServerName'NE' --resource-group $rgName --query 'defaultHostName' -o tsv)
+$fqdnAppNE='{\"fqdn\":\"' + $fqdnAppNE + '\",\"ip_address\":null}'
+az network application-gateway probe create --resource-group $rgAppGw --gateway-name $appGWName'WE' --name $webAppServerName --path / --protocol Http --host $(az webapp show --name $webAppServerName --resource-group $rgName --query 'defaultHostName' -o tsv) --no-wait
+az network application-gateway probe create --resource-group $rgAppGw --gateway-name $appGWName'NE' --name $webAppServerName'NE' --path / --protocol Http --host $(az webapp show --name $webAppServerName'NE' --resource-group $rgName --query 'defaultHostName' -o tsv) --no-wait
+az network application-gateway http-settings update --resource-group $rgAppGw --gateway-name $appGWName'WE' --name appGatewayBackendHttpSettings --probe $webAppServerName --host-name-from-backend-pool
+az network application-gateway http-settings update --resource-group $rgAppGw --gateway-name $appGWName'NE' --name appGatewayBackendHttpSettings --probe $webAppServerName'NE' --host-name-from-backend-pool
+az network application-gateway address-pool update --resource-group $rgAppGw --gateway-name $appGWName'WE' --name appGatewayBackendPool --add backendAddresses $fqdnAppWE --no-wait
+az network application-gateway address-pool update --resource-group $rgAppGw --gateway-name $appGWName'NE' --name appGatewayBackendPool --add backendAddresses $fqdnAppNE --no-wait
+az network public-ip show --name $appGWName'-WE-PIP' --resource-group $rgAppGw --query 'ipAddress' -o tsv
+az network public-ip show --name $appGWName'-NE-PIP' --resource-group $rgAppGw --query 'ipAddress' -o tsv
+
+# Deploy the Traffic Manager
+az network traffic-manager profile create --name $trafficManagerName --resource-group $rgName --routing-method Performance --unique-dns-name $dnsName --protocol HTTP --status Enabled
+az network traffic-manager endpoint create --name $webAppServerName --profile-name $trafficManagerName --resource-group $rgName --type externalEndpoints --endpoint-status Enabled --target $(az network public-ip show --name $appGWName'-WE-PIP' --resource-group $rgAppGw --query 'ipAddress' -o tsv) --endpoint-location $location
+az network traffic-manager endpoint create --name $webAppServerName'NE' --profile-name $trafficManagerName --resource-group $rgName --type externalEndpoints --endpoint-status Enabled --target $(az network public-ip show --name $appGWName'-NE-PIP' --resource-group $rgAppGw --query 'ipAddress' -o tsv) --endpoint-location $location2
+az network traffic-manager profile show --name $trafficManagerName --resource-group $rgName --query 'dnsConfig.fqdn' -o tsv
+
+# Information needed
+az cosmosdb show --name $dbServerName --resource-group $rgName --query 'documentEndpoint' -o tsv
+az cosmosdb keys list --name $dbServerName --resource-group $rgName --query 'primaryMasterKey' -o tsv

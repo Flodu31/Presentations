@@ -1,6 +1,6 @@
 #Initiate
 az login
-az account set --subscription "ce6d976b-5197-4ae5-8467-173ddf912b64"
+az account set --subscription "SubId"
 
 # AppGw
 $rgAppGw='VirtualAzureAppGw'

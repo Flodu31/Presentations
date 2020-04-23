@@ -30,7 +30,7 @@ az group create --resource-group $rgName --location $location
 az cosmosdb create --name $dbServerName --resource-group $rgName --locations regionName=westus2 failoverPriority=0 isZoneRedundant=False --locations regionName=eastus2 failoverPriority=1 isZoneRedundant=False --enable-multiple-write-locations --enable-automatic-failover 
 
 # Deploy the WebApp
-az appservice plan create --name $aspServerName --resource-group $rgName --sku S1
+az appservice plan create --name $aspServerName --resource-group $rgName --sku S1 --location $location
 az appservice plan create --name $aspServerName'NE' --resource-group $rgName --sku S1 --location $location2
 az webapp create --name $webAppServerName --resource-group $rgName --plan $aspServerName
 az webapp create --name $webAppServerName'NE' --resource-group $rgName --plan $aspServerName'NE'

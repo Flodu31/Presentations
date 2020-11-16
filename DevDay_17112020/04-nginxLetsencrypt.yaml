@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+   name: devdayletsencrypt
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: devdayletsencrypt
+  labels:
+    app: devdayletsencrypt
+  namespace: devdayletsencrypt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devdayletsencrypt
+  template:
+    metadata:
+      labels:
+        app: devdayletsencrypt
+    spec:
+      containers:
+      - name: nginx
+        image: phpmyadmin/phpmyadmin:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: devdayletsencrypt
+  namespace: devdayletsencrypt
+spec:
+  selector:
+    app: devdayletsencrypt
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: devdayletsencrypt
+  namespace: devdayletsencrypt
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - demodevday2.cloudyjourney.fr
+    secretName: devday-letsencrypt-secret
+  rules:
+  - host: demodevday2.cloudyjourney.fr
+    http:
+      paths:
+      - backend:
+          serviceName: devdayletsencrypt
+          servicePort: 80

@@ -1,0 +1,56 @@
+az login
+az account set --subscription "Microsoft Azure Sponsorship - Test"
+
+rgName="FestTechCal"
+vnetName="FestTechCal"
+aksClusterName="FestTechCal"
+appGwSubnet="AppGateway"
+aksSubnet="AKS"
+
+#Create the network
+az group create -l westeurope -n $rgName
+az network vnet create -g $rgName -n $vnetName --address-prefix 10.0.0.0/16 --subnet-name $aksSubnet --subnet-prefix 10.0.0.0/24
+az network vnet subnet create --address-prefixes 10.0.1.0/24 -n $appGwSubnet -g $rgName --vnet-name $vnetName
+
+#AKS
+az aks create --name $aksClusterName --resource-group $rgName --dns-name-prefix $aksClusterName"demo" --network-plugin azure --node-count 1 --no-ssh-key --enable-addons monitoring --vnet-subnet-id $(az network vnet subnet show -g $rgName -n $aksSubnet --vnet-name $vnetName --query id -o tsv) --service-cidr "10.240.0.0/20" --dns-service-ip "10.240.0.10" --enable-managed-identity
+az aks get-credentials --resource-group $rgName --name $aksClusterName
+kubectl get nodes
+kubectl apply -f 01-nginx.yaml
+kubectl get pods -A
+
+#AppGateway
+az network public-ip create --resource-group $rgName --name $aksClusterName"PublicIp" --allocation-method Static --sku Standard
+az network application-gateway create -g $rgName -n $aksClusterName"AppGW" --capacity 1 --sku WAF_v2 --vnet-name $vnetName --subnet $appGwSubnet --http-settings-cookie-based-affinity Enabled --public-ip-address $aksClusterName"PublicIp" --private-ip-address 10.0.1.100
+#Bug AzCli 2.13/2.14: https://github.com/MicrosoftDocs/azure-docs/issues/64856
+az network application-gateway frontend-ip delete --resource-group $rgName --gateway-name $aksClusterName"AppGW" --name appGatewayPrivateFrontendIP
+az network application-gateway waf-config set --enabled true --gateway-name $aksClusterName"AppGW" --resource-group $rgName --firewall-mode Prevention --rule-set-version 3.0
+
+#Ingress controller
+az feature register --name AKS-IngressApplicationGatewayAddon --namespace microsoft.containerservice
+az feature list -o table --query "[?contains(name, 'microsoft.containerservice/AKS-IngressApplicationGatewayAddon')].{Name:name,State:properties.state}"
+az provider register --namespace Microsoft.ContainerService
+az extension add --name aks-preview
+az extension list
+az aks enable-addons -n $aksClusterName -g $rgName -a ingress-appgw --appgw-id $(az network application-gateway show -n $aksClusterName"AppGW" -g $rgName -o tsv --query "id")
+aksIdentity=$(az identity show -n ingressapplicationgateway-festtechcalaks -g MC_FestTechCal_FestTechCalAKS_westeurope --query clientId -o tsv)
+az role assignment create --role Reader --scope /subscriptions/subscriptionId/resourceGroups/$rgName --assignee $aksIdentity
+az role assignment create --role Contributor --scope /subscriptions/subscriptionId/resourceGroups/$rgName/providers/Microsoft.Network/applicationGateways/$aksClusterName"AppGW" --assignee $aksIdentity
+kubectl apply -f 02-nginxIngress.yaml
+kubectl get ingress -A
+
+#Lets Encrypt
+publicIP=$(az network public-ip show --resource-group $rgName --name $aksClusterName"PublicIp" --query ipAddress -o tsv)
+az account set --subscription "Microsoft Azure Sponsorship - Prod"
+az network dns record-set a add-record -g DNS -z cloudyjourney.fr --record-set-name festtechcal --ipv4-address $publicIP
+az account set --subscription "Microsoft Azure Sponsorship - Test"
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.16.0/cert-manager.crds.yaml
+kubectl create namespace cert-manager
+kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v0.16.0 --set ingressShim.defaultIssuerName=letsencrypt-prod --set ingressShim.defaultIssuerKind=ClusterIssuer
+kubectl create secret generic azuredns-config-sponsorship --from-literal=client-secret=secretkey -n cert-manager
+kubectl apply -f 03-certmanager-prd.yaml
+kubectl apply -f 04-nginxLetsencrypt.yaml
+kubectl logs cert-manager-6b5cbfd99c-p87mb -n cert-manager

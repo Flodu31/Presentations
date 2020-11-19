@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+   name: festtechcalletsencrypt
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: festtechcalletsencrypt
+  labels:
+    app: festtechcalletsencrypt
+  namespace: festtechcalletsencrypt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: festtechcalletsencrypt
+  template:
+    metadata:
+      labels:
+        app: festtechcalletsencrypt
+    spec:
+      containers:
+      - name: phpmyadmin
+        image: phpmyadmin/phpmyadmin:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: festtechcalletsencrypt
+  namespace: festtechcalletsencrypt
+spec:
+  selector:
+    app: festtechcalletsencrypt
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: festtechcalletsencrypt
+  namespace: festtechcalletsencrypt
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - demofesttechcal.cloudyjourney.fr
+    secretName: festtechcal-letsencrypt-secret
+  rules:
+  - host: demofesttechcal.cloudyjourney.fr
+    http:
+      paths:
+      - backend:
+          serviceName: festtechcalletsencrypt
+          servicePort: 80

@@ -21,9 +21,7 @@ kubectl get pods -A
 
 #AppGateway
 az network public-ip create --resource-group $rgName --name $aksClusterName"PublicIp" --allocation-method Static --sku Standard
-az network application-gateway create -g $rgName -n $aksClusterName"AppGW" --capacity 1 --sku WAF_v2 --vnet-name $vnetName --subnet $appGwSubnet --http-settings-cookie-based-affinity Enabled --public-ip-address $aksClusterName"PublicIp" --private-ip-address 10.0.1.100
-#Bug AzCli 2.13/2.14: https://github.com/MicrosoftDocs/azure-docs/issues/64856
-az network application-gateway frontend-ip delete --resource-group $rgName --gateway-name $aksClusterName"AppGW" --name appGatewayPrivateFrontendIP
+az network application-gateway create -g $rgName -n $aksClusterName"AppGW" --capacity 1 --sku WAF_v2 --vnet-name $vnetName --subnet $appGwSubnet --http-settings-cookie-based-affinity Enabled --public-ip-address $aksClusterName"PublicIp"
 az network application-gateway waf-config set --enabled true --gateway-name $aksClusterName"AppGW" --resource-group $rgName --firewall-mode Prevention --rule-set-version 3.0
 
 #Ingress controller

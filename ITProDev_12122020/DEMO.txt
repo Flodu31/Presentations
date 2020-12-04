@@ -40,7 +40,7 @@ kubectl get ingress -A
 #Lets Encrypt
 publicIP=$(az network public-ip show --resource-group $rgName --name $aksClusterName"PublicIp" --query ipAddress -o tsv)
 az account set --subscription "Microsoft Azure Sponsorship - Prod"
-az network dns record-set a add-record -g DNS -z cloudyjourney.fr --record-set-name demofesttechcal --ipv4-address $publicIP
+az network dns record-set a add-record -g DNS -z cloudyjourney.fr --record-set-name demoitprodev --ipv4-address $publicIP
 az account set --subscription "Microsoft Azure Sponsorship - Test"
 kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.16.0/cert-manager.crds.yaml
 kubectl create namespace cert-manager

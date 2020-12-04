@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+   name: itprodevletsencrypt
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: itprodevletsencrypt
+  labels:
+    app: itprodevletsencrypt
+  namespace: itprodevletsencrypt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: itprodevletsencrypt
+  template:
+    metadata:
+      labels:
+        app: itprodevletsencrypt
+    spec:
+      containers:
+      - name: phpmyadmin
+        image: phpmyadmin/phpmyadmin:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: itprodevletsencrypt
+  namespace: itprodevletsencrypt
+spec:
+  selector:
+    app: itprodevletsencrypt
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: itprodevletsencrypt
+  namespace: itprodevletsencrypt
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - demoitprodev.cloudyjourney.fr
+    secretName: itprodev-letsencrypt-secret
+  rules:
+  - host: demoitprodev.cloudyjourney.fr
+    http:
+      paths:
+      - backend:
+          serviceName: itprodevletsencrypt
+          servicePort: 80

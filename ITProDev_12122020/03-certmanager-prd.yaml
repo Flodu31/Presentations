@@ -1,0 +1,27 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+    acme:
+      email: florent@falaconsulting.be
+      server: https://acme-v02.api.letsencrypt.org/directory
+      privateKeySecretRef:
+        name: issuer-account-key
+      solvers:
+        - selector:
+            dnsZones:
+            - cloudyjourney.fr
+          dns01:
+            azuredns:
+              clientID: 551a2e4f-a492-457e-9219-b25e25e6d0cf
+              clientSecretSecretRef:
+              # The following is the secret we created in Kubernetes. Issuer will use this to present challenge to Azure DNS.
+                name: azuredns-config-sponsorship
+                key: client-secret
+              subscriptionID: 561da115-2079-4288-9f09-89491503c804
+              tenantID: 4c58cbef-8923-450e-a31d-a8f181728c86
+              resourceGroupName: DNS
+              hostedZoneName: cloudyjourney.fr
+              # Azure Cloud Environment, default to AzurePublicCloud
+              environment: AzurePublicCloud

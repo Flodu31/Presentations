@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+   name: meetupdvoletsencrypt
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: meetupdvoletsencrypt
+  labels:
+    app: meetupdvoletsencrypt
+  namespace: meetupdvoletsencrypt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meetupdvoletsencrypt
+  template:
+    metadata:
+      labels:
+        app: meetupdvoletsencrypt
+    spec:
+      containers:
+      - name: nginx
+        image: phpmyadmin/phpmyadmin:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meetupdvoletsencrypt
+  namespace: meetupdvoletsencrypt
+spec:
+  selector:
+    app: meetupdvoletsencrypt
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: meetupdvoletsencrypt
+  namespace: meetupdvoletsencrypt
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - demomeetupdvo.cloudyjourney.fr
+    secretName: meetupdvo-letsencrypt-secret
+  rules:
+  - host: demomeetupdvo.cloudyjourney.fr
+    http:
+      paths:
+      - backend:
+          serviceName: meetupdvoletsencrypt
+          servicePort: 80

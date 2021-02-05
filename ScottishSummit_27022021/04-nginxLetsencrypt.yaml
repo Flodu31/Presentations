@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+   name: scotthishsummitletsencrypt
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: scotthishsummitletsencrypt
+  labels:
+    app: scotthishsummitletsencrypt
+  namespace: scotthishsummitletsencrypt
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scotthishsummitletsencrypt
+  template:
+    metadata:
+      labels:
+        app: scotthishsummitletsencrypt
+    spec:
+      containers:
+      - name: nginx
+        image: phpmyadmin/phpmyadmin:latest
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scotthishsummitletsencrypt
+  namespace: scotthishsummitletsencrypt
+spec:
+  selector:
+    app: scotthishsummitletsencrypt
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: scotthishsummitletsencrypt
+  namespace: scotthishsummitletsencrypt
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - demoscotthishsummit.cloudyjourney.fr
+    secretName: scotthishsummit-letsencrypt-secret
+  rules:
+  - host: demoscotthishsummit.cloudyjourney.fr
+    http:
+      paths:
+      - backend:
+          serviceName: scotthishsummitletsencrypt
+          servicePort: 80

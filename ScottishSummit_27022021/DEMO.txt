@@ -1,0 +1,50 @@
+az login
+subId=c1ee26fd-0ad0-4392-8b72-b5a3383135a0
+rgName="ScottishSummit"
+vnetName="ScottishSummitVnet"
+aksClusterName="ScottishSummitAKS"
+appGwSubnet="AppGateway"
+aksSubnet="AKS"
+az account set --subscription $subId
+cd /mnt/c/Users/flore/OneDrive/Temp/ScottishSummit/Demo
+
+#Create the network
+az group create -l westeurope -n $rgName
+az network vnet create -g $rgName -n $vnetName --address-prefix 10.0.0.0/16 --subnet-name $aksSubnet --subnet-prefix 10.0.0.0/24
+az network vnet subnet create --address-prefixes 10.0.1.0/24 -n $appGwSubnet -g $rgName --vnet-name $vnetName
+
+#AppGateway
+az network public-ip create --resource-group $rgName --name $aksClusterName"PublicIp" --allocation-method Static --sku Standard
+az network application-gateway create -g $rgName -n $aksClusterName"AppGW" --capacity 1 --sku WAF_v2 --vnet-name $vnetName --subnet $appGwSubnet --http-settings-cookie-based-affinity Enabled --public-ip-address $aksClusterName"PublicIp"
+az network application-gateway waf-config set --enabled true --gateway-name $aksClusterName"AppGW" --resource-group $rgName --firewall-mode Prevention --rule-set-version 3.1
+
+#AKS
+az aks create --name $aksClusterName --resource-group $rgName --dns-name-prefix $aksClusterName"demo" --network-plugin azure --node-count 1 --no-ssh-key --enable-addons monitoring --vnet-subnet-id $(az network vnet subnet show -g $rgName -n $aksSubnet --vnet-name $vnetName --query id -o tsv) --service-cidr "10.240.0.0/20" --dns-service-ip "10.240.0.10" --enable-managed-identity
+az aks get-credentials --resource-group $rgName --name $aksClusterName
+kubectl get nodes
+kubectl apply -f 01-nginx.yaml
+kubectl get pods -A
+kubectl get svc -A
+#Ingress
+az aks enable-addons -n $aksClusterName -g $rgName -a ingress-appgw --appgw-id $(az network application-gateway show -n $aksClusterName"AppGW" -g $rgName -o tsv --query "id")
+identity=$(az identity show --name ingressapplicationgateway-$aksClusterName --resource-group MC_${rgName}_${aksClusterName}_westeurope --query clientId -o tsv)
+az role assignment create --role Reader --scope /subscriptions/$subId/resourceGroups/$rgName --assignee $identity
+az role assignment create --role Contributor --scope /subscriptions/$subId/resourceGroups/$rgName/providers/Microsoft.Network/applicationGateways/$aksClusterName"AppGW" --assignee $identity
+kubectl apply -f 02-nginxIngress.yaml
+kubectl get ingress -A
+
+#Lets Encrypt
+publicIP=$(az network public-ip show --resource-group $rgName --name $aksClusterName"PublicIp" --query ipAddress -o tsv)
+az account set --subscription "Microsoft Azure Sponsorship - Prod"
+az network dns record-set a add-record -g DNS -z cloudyjourney.fr --record-set-name demoscotthishsummit --ipv4-address $publicIP
+az account set --subscription $subId
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.16.0/cert-manager.crds.yaml
+kubectl create namespace cert-manager
+kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v0.16.0 --set ingressShim.defaultIssuerName=letsencrypt-prod --set ingressShim.defaultIssuerKind=ClusterIssuer
+kubectl create secret generic azuredns-config-sponsorship --from-literal=client-secret=secret -n cert-manager
+kubectl apply -f 03-certmanager-prd.yaml
+kubectl apply -f 04-nginxLetsencrypt.yaml
+kubectl logs cert-manager-6b5cbfd99c-p87mb -n cert-manager
